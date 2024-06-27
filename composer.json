@@ -1,0 +1,13 @@
+{
+    "name": "emanjamal/curd_app_php",
+    "description": "A CRUD application using pure PHP",
+    "type": "project",
+    "authors": [
+        {
+            "name": "Eman Jamal",
+            "email": "emanjse@gmail.com"
+        }
+    ],
+    "minimum-stability": "stable",
+    "require": {}
+}
