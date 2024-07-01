@@ -3,6 +3,7 @@ class User
 {
     private $conn;
     private $table_name = "users";
+    private $error;
 
     public $id;
     public $username;
@@ -10,7 +11,6 @@ class User
     public $age;
     public $email;
     public $password;
-   
 
     public function __construct($db)
     {
@@ -18,7 +18,7 @@ class User
     }
 
     // Validate email format
-    private function isValidEmail($email)
+    public function isValidEmail($email)
     {
         return filter_var($email, FILTER_VALIDATE_EMAIL) !== false;
     }
@@ -32,7 +32,13 @@ class User
     // Register a new user
     public function register()
     {
-        if (!$this->validateFields() || !$this->isValidEmail($this->email)) {
+        if (!$this->validateFields()) {
+            $this->error = "Incomplete data.";
+            return false;
+        }
+
+        if (!$this->isValidEmail($this->email)) {
+            $this->error = "Email format is not right.";
             return false;
         }
 
@@ -52,6 +58,7 @@ class User
         }
         return false;
     }
+
 
     // Login user
     public function login()
@@ -124,11 +131,25 @@ class User
     //Update user
     public function update()
     {
-        $query = "UPDATE users SET username = :username, address = :address, age = :age, email = :email WHERE id = :id";
-
+        // Check if the user exists
+        $query = "SELECT id FROM " . $this->table_name . " WHERE id = :id";
         $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':id', $this->id);
+        $stmt->execute();
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
+        // If the user doesn't exist
+        if (!$row) {
+            return 'not_exist';
+        }
 
+        // If the logged-in user is not the owner of the user data
+        if ($row['id'] != $_SESSION['user_id']) {
+            return 'not_owner';
+        }
+
+        $query = "UPDATE users SET username = :username, address = :address, age = :age, email = :email WHERE id = :id";
+        $stmt = $this->conn->prepare($query);
         $stmt->bindParam(':username', $this->username);
         $stmt->bindParam(':address', $this->address);
         $stmt->bindParam(':age', $this->age);
@@ -139,36 +160,30 @@ class User
             return true;
         }
 
-        printf("Error: %s.\n", $stmt->error);
-
         return false;
     }
-
     //Delete user
-    public function delete()
+    public function delete($logged_in_user_id)
     {
-        // Check if the user exists
-        if (!$this->getUserById()) {
-            $this->error = "User does not exist.";
-            return false;
-        }
-
-        $query = "DELETE FROM " . $this->table_name . " WHERE id = :id";
+        // Fetch user details to check ownership
+        $query = "SELECT id FROM " . $this->table_name . " WHERE id = :id AND id = :logged_in_user_id";
         $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':id', $this->id);
+        $stmt->bindParam(':logged_in_user_id', $logged_in_user_id);
+        $stmt->execute();
 
-        $stmt->bindParam(':id', $this->id, PDO::PARAM_INT);
+        if ($stmt->rowCount() > 0) {
+            // User is the owner, proceed with deletion
+            $query = "DELETE FROM " . $this->table_name . " WHERE id = :id";
+            $stmt = $this->conn->prepare($query);
+            $stmt->bindParam(':id', $this->id);
 
-        if ($stmt->execute()) {
-            return true;
+            if ($stmt->execute()) {
+                return true;
+            }
         }
 
-        $this->error = "Unable to delete user.";
         return false;
-    }
-
-    public function getError()
-    {
-        return $this->error;
     }
 
 }

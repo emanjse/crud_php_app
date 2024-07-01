@@ -14,7 +14,7 @@ $post = new Post($db);
 
 $data = json_decode(file_get_contents("php://input"));
 
-// Check if JSON decoding failed
+
 if ($data === null && json_last_error() !== JSON_ERROR_NONE) {
     http_response_code(400);
     echo json_encode(array("message" => "Invalid JSON data."));
@@ -23,7 +23,7 @@ if ($data === null && json_last_error() !== JSON_ERROR_NONE) {
 
 // Check if all required fields are present
 if (
-    !isset($data->user_id) ||
+    !isset($_SESSION['user_id']) ||
     !isset($data->title) ||
     !isset($data->content)
 ) {
@@ -33,7 +33,7 @@ if (
 }
 
 // Assign values to Post object properties
-$post->user_id = $data->user_id;
+$post->user_id = $_SESSION['user_id'];
 $post->title = $data->title;
 $post->content = $data->content;
 $post->created_at = date('Y-m-d H:i:s');

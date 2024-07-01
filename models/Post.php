@@ -86,9 +86,25 @@ class Post
     // Update a post
     public function update()
     {
-        $query = "UPDATE " . $this->table_name . "
-                  SET title = :title, content = :content WHERE id = :id";
+        // Check if the post exists
+        $query = "SELECT user_id FROM " . $this->table_name . " WHERE id = :id";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':id', $this->id);
+        $stmt->execute();
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
+        // If the post doesn't exist
+        if (!$row) {
+            return 'not_exist';
+        }
+
+        // If the logged-in user is not the owner of the post
+        if ($row['user_id'] != $_SESSION['user_id']) {
+            return 'not_owner';
+        }
+
+        // Proceed with the update
+        $query = "UPDATE " . $this->table_name . " SET title = :title, content = :content WHERE id = :id";
         $stmt = $this->conn->prepare($query);
 
         $stmt->bindParam(':title', $this->title);
@@ -102,16 +118,27 @@ class Post
         return false;
     }
 
-     // Delete a post
-     public function delete()
-     {
-         $query = "DELETE FROM " . $this->table_name . " WHERE id = :id";
-         $stmt = $this->conn->prepare($query);
-         $stmt->bindParam(':id', $this->id);
-         if ($stmt->execute()) {
-             return true;
-         }
-         return false;
-     }
+
+    // Delete a post
+    public function delete($logged_in_user_id)
+    {
+        // Fetch the post details to check the owner
+        $query = "SELECT user_id FROM " . $this->table_name . " WHERE id = :id";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':id', $this->id);
+        $stmt->execute();
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($row && $row['user_id'] == $logged_in_user_id) {
+            $query = "DELETE FROM " . $this->table_name . " WHERE id = :id";
+            $stmt = $this->conn->prepare($query);
+            $stmt->bindParam(':id', $this->id);
+            if ($stmt->execute()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }
 ?>
