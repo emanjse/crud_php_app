@@ -1,54 +1,60 @@
 <?php
-session_start();
-header("Access-Control-Allow-Origin: *");
-header("Content-Type: application/json; charset=UTF-8");
-header("Access-Control-Allow-Methods: GET");
-include_once '../config/Database.php';
-include_once '../models/User.php';
+require_once __DIR__ . '/../vendor/autoload.php';
 
+use Config\Database;
+use Models\User;
+use Utils\Utils;
 
 $database = new Database();
-$db = $database->getConnection();
 
+$usersController = new UsersController($database);
+$usersController->getUsers();
 
-$user = new User($db);
+class UsersController
+{
+    private $db;
 
-
-$stmt = $user->getAllUsers();
-$num = $stmt->rowCount();
-
-// Check if any users exist
-if ($num > 0) {
-    $users_arr = array();
-    $users_arr["users"] = array();
-
-    // Retrieve user rows
-    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        extract($row);
-
-        $user_item = array(
-            "id" => $id,
-            "username" => $username,
-            "address" => $address,
-            "age" => $age,
-            "email" => $email
-
-        );
-
-
-        array_push($users_arr["users"], $user_item);
+    public function __construct(Database $database)
+    {
+        $this->db = $database->getConnection();
     }
 
+    public function getUsers()
+    {
+        session_start();
+        Utils::setHeaders();
+        Utils::validateRequestMethod(['GET']);
 
-    http_response_code(200);
+        $user = new User($this->db);
 
+        $stmt = $user->getAllUsers();
+        $num = $stmt->rowCount();
 
-    echo json_encode($users_arr);
-} else {
-    // No users found
-    http_response_code(404);
-    echo json_encode(
-        array("message" => "No users found.")
-    );
+        if ($num > 0) {
+            $users_arr = array();
+            $users_arr["users"] = array();
+
+            while ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
+                extract($row);
+
+                $user_item = array(
+                    "id" => $id,
+                    "username" => $username,
+                    "address" => $address,
+                    "age" => $age,
+                    "email" => $email
+                );
+
+                array_push($users_arr["users"], $user_item);
+            }
+
+            http_response_code(200);
+            echo json_encode($users_arr);
+        } else {
+            http_response_code(404);
+            echo json_encode(
+                array("message" => "No users found.")
+            );
+        }
+    }
 }
-?>

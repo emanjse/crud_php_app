@@ -1,55 +1,62 @@
 <?php
 session_start();
-header("Access-Control-Allow-Origin: *");
-header("Content-Type: application/json; charset=UTF-8");
-header("Access-Control-Allow-Methods: POST");
+require_once __DIR__ . '/../vendor/autoload.php';
 
-include_once '../config/Database.php';
-include_once '../models/Post.php';
-
+use Config\Database;
+use Utils\Utils;
+use Models\Post;
 
 $database = new Database();
-$db = $database->getConnection();
-$post = new Post($db);
+$updatePostController = new UpdatePostController($database);
 
+$updatePostController->updatePost();
 
-$post_id = isset($_GET['id']) ? $_GET['id'] : die();
+class UpdatePostController
+{
+    private $db;
 
+    public function __construct(Database $database)
+    {
+        $this->db = $database->getConnection();
+    }
 
-$post->id = $post_id;
-if (!$post->getPostById()) {
-    http_response_code(404);
-    echo json_encode(array("message" => "Post does not exist."));
-    exit();
+    public function updatePost()
+    {
+        Utils::setHeaders();
+        Utils::validateRequestMethod(['POST']);
+
+        $post_id = isset($_GET['id']) ? $_GET['id'] : null;
+        if (!$post_id) {
+            Utils::respondWithError(400, "Post ID is required.");
+        }
+
+        $post = new Post($this->db);
+        $post->id = $post_id;
+        if (!$post->getPostById()) {
+            Utils::respondWithError(404, "Post does not exist.");
+        }
+
+        $data = json_decode(file_get_contents("php://input"));
+
+        if (!isset($data->title) || !isset($data->content)) {
+            Utils::respondWithError(400, "Incomplete data.");
+        }
+
+        $post->title = $data->title;
+        $post->content = $data->content;
+
+        $updateResult = $post->update();
+
+        if ($updateResult === 'not_owner') {
+            Utils::respondWithError(403, "You can't update this post.");
+        } elseif ($updateResult === 'not_exist') {
+            Utils::respondWithError(404, "Post does not exist.");
+        } elseif ($updateResult === true) {
+            Utils::respondWithSuccess(200, "Post updated successfully.");
+        } else {
+            Utils::respondWithError(500, "Unable to update post.");
+        }
+    }
 }
 
-$data = json_decode(file_get_contents("php://input"));
-
-// Validate input data
-if (!isset($data->title) || !isset($data->content)) {
-    http_response_code(400);
-    echo json_encode(array("message" => "Incomplete data."));
-    exit();
-}
-
-
-$post->title = $data->title;
-$post->content = $data->content;
-
-
-$updateResult = $post->update();
-
-if ($updateResult === 'not_owner') {
-    http_response_code(403);
-    echo json_encode(array("message" => "You can't update this post."));
-} elseif ($updateResult === 'not_exist') {
-    http_response_code(404);
-    echo json_encode(array("message" => "Post does not exist."));
-} elseif ($updateResult === true) {
-    http_response_code(200);
-    echo json_encode(array("message" => "Post updated successfully."));
-} else {
-    http_response_code(500);
-    echo json_encode(array("message" => "Unable to update post."));
-}
 ?>

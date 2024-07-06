@@ -1,4 +1,10 @@
 <?php
+
+namespace Config;
+
+use PDO;
+use PDOException;
+
 class Database
 {
     private $host = 'localhost';
@@ -19,5 +25,4 @@ class Database
         return $this->conn;
     }
 }
-
 ?>

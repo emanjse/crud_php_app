@@ -1,42 +1,51 @@
 <?php
-session_start();
-header("Access-Control-Allow-Origin: *");
-header("Content-Type: application/json; charset=UTF-8");
-header("Access-Control-Allow-Methods: POST");
+require_once __DIR__ . '/../vendor/autoload.php';
 
-include_once '../config/Database.php';
-include_once '../models/User.php';
+use Utils\Utils;
+use Config\Database;
+use Models\User;
+
 
 $database = new Database();
-$db = $database->getConnection();
+$LoginController = new LoginController($database);
 
-$user = new User($db);
+$LoginController->login();
+class LoginController
+{
+    private $db;
 
-$data = json_decode(file_get_contents("php://input"));
-
-if (
-    !empty($data->email) &&
-    !empty($data->password)
-) {
-    $user->email = $data->email;
-    $user->password = $data->password;
-
-    if (!$user->isValidEmail($user->email)) {
-        http_response_code(400);
-        echo json_encode(array("message" => "Email format is not right."));
-        exit;
+    public function __construct(Database $database)
+    {
+        $this->db = $database->getConnection();
     }
 
-    if ($user->login()) {
-        $_SESSION['user_id'] = $user->id;
-        http_response_code(200);
-        echo json_encode(array("message" => "Login successful.", "user_id" => $user->id));
-    } else {
-        http_response_code(401);
-        echo json_encode(array("message" => "Login failed."));
+    public function login()
+    {
+        session_start();
+        Utils::setHeaders();
+        Utils::validateRequestMethod(['POST']);
+
+        $user = new User($this->db);
+        $data = Utils::parseJsonInput();
+
+        if (!empty($data->email) && !empty($data->password)) {
+            $user->email = $data->email;
+            $user->password = $data->password;
+
+            if (!$user->isValidEmail($user->email)) {
+                Utils::respondWithError(400, "Email format is not right.");
+            }
+
+            if ($user->login()) {
+                $_SESSION['user_id'] = $user->id;
+                Utils::respondWithSuccess(200, "Login successful.", ["user_id" => $user->id]);
+            } else {
+                Utils::respondWithError(401, "Login failed.");
+            }
+        } else {
+            Utils::respondWithError(400, "Incomplete data.");
+        }
     }
-} else {
-    http_response_code(400);
-    echo json_encode(array("message" => "Incomplete data."));
 }
+
 ?>

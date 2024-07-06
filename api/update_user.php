@@ -1,76 +1,56 @@
 <?php
 session_start();
-header("Access-Control-Allow-Origin: *");
-header("Content-Type: application/json; charset=UTF-8");
-header("Access-Control-Allow-Methods: POST");
+require_once __DIR__ . '/../vendor/autoload.php';
 
-include_once '../config/Database.php';
-include_once '../models/User.php';
-
-
-if (!isset($_SESSION['user_id'])) {
-    http_response_code(401);
-    echo json_encode(array("message" => "Unauthorized."));
-    exit();
-}
-
-
-$logged_in_user_id = $_SESSION['user_id'];
-
-
-$user_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
-
-if ($user_id !== $logged_in_user_id) {
-    http_response_code(403);
-    echo json_encode(array("message" => "You can't update another user's data."));
-    exit();
-}
-
+use Config\Database;
+use Models\User;
+use Utils\Utils;
 
 $database = new Database();
-$db = $database->getConnection();
-$user = new User($db);
+$controller = new UpdateUserController($database);
 
+$logged_in_user_id = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : null;
+$data = Utils::parseJsonInput();
 
-$user->id = $logged_in_user_id;
-
-// Check if the user exists
-if (!$user->getUserById()) {
-    http_response_code(404);
-    echo json_encode(array("message" => "User not found."));
-    exit();
-}
-
-
-$data = json_decode(file_get_contents("php://input"));
-
-// Validate input data
-if (empty($data->username) || empty($data->address) || empty($data->age) || empty($data->email)) {
-    http_response_code(400);
-    echo json_encode(array("message" => "Incomplete data."));
-    exit();
-}
-
-
-$user->username = $data->username;
-$user->address = $data->address;
-$user->age = $data->age;
-$user->email = $data->email;
-
-
-$updateResult = $user->update();
-
-if ($updateResult === 'not_owner') {
-    http_response_code(403);
-    echo json_encode(array("message" => "You can't update this user."));
-} elseif ($updateResult === 'not_exist') {
-    http_response_code(404);
-    echo json_encode(array("message" => "User does not exist."));
-} elseif ($updateResult === true) {
-    http_response_code(200);
-    echo json_encode(array("message" => "User information updated."));
+if ($logged_in_user_id) {
+    $controller->updateUser($logged_in_user_id, $data);
 } else {
-    http_response_code(500);
-    echo json_encode(array("message" => "Unable to update user information."));
+    Utils::respondWithError(401, "Unauthorized.");
 }
+
+class UpdateUserController
+{
+    private $db;
+
+    public function __construct(Database $database)
+    {
+        $this->db = $database->getConnection();
+    }
+
+    public function updateUser($logged_in_user_id, $data)
+    {
+        Utils::setHeaders();
+        Utils::validateRequestMethod(['POST']);
+
+        $user = new User($this->db);
+        $user->id = $logged_in_user_id;
+
+        if (!$user->getUserById()) {
+            Utils::respondWithError(404, "User not found.");
+        }
+
+        $updateResult = $user->update($data);
+
+        if ($updateResult['success']) {
+            Utils::respondWithSuccess(200, $updateResult['message']);
+        } else {
+            Utils::respondWithError(400, $updateResult['message']);
+        }
+    }
+}
+
+
+
+
+
 ?>

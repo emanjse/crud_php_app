@@ -1,38 +1,56 @@
 <?php
 session_start();
-header("Access-Control-Allow-Origin: *");
-header("Content-Type: application/json; charset=UTF-8");
-header("Access-Control-Allow-Methods: GET");
+require_once __DIR__ . '/../vendor/autoload.php';
 
-include_once '../config/Database.php';
-include_once '../models/Post.php';
+use Config\Database;
+use Utils\Utils;
+use Models\Post;
 
 $database = new Database();
-$db = $database->getConnection();
+$getPostByIdController = new GetPostByIdController($database);
 
-$post = new Post($db);
+$getPostByIdController->getPostById();
 
-$post->id = isset($_GET['id']) ? $_GET['id'] : die();
+class GetPostByIdController
+{
+    private $db;
 
-$stmt = $post->getPostById();
-$num = $stmt->rowCount();
+    public function __construct(Database $database)
+    {
+        $this->db = $database->getConnection();
+    }
 
-if ($num > 0) {
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    extract($row);
+    public function getPostById()
+    {
+        Utils::setHeaders();
+        Utils::validateRequestMethod(['GET']);
 
-    $post_item = array(
-        "id" => $id,
-        "user_id" => $user_id,
-        "title" => $title,
-        "content" => html_entity_decode($content),
-        "created_at" => $created_at
-    );
+        $post_id = isset($_GET['id']) ? $_GET['id'] : null;
+        if (!$post_id) {
+            Utils::respondWithError(400, "Post ID is required.");
+        }
 
-    http_response_code(200);
-    echo json_encode($post_item);
-} else {
-    http_response_code(404);
-    echo json_encode(array("message" => "Post not found."));
+        $post = new Post($this->db);
+        $post->id = $post_id;
+
+        $stmt = $post->getPostById();
+        $num = $stmt->rowCount();
+
+        if ($num > 0) {
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            $post_item = array(
+                "id" => $row['id'],
+                "user_id" => $row['user_id'],
+                "title" => $row['title'],
+                "content" => html_entity_decode($row['content']),
+                "created_at" => $row['created_at']
+            );
+
+            Utils::respondWithSuccess(200, "Post found.", $post_item);
+        } else {
+            Utils::respondWithError(404, "Post not found.");
+        }
+    }
 }
+
 ?>

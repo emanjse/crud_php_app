@@ -9,5 +9,13 @@
         }
     ],
     "minimum-stability": "stable",
-    "require": {}
+    "require": {},
+    "autoload": {
+        "psr-4": {
+            "Config\\": "config/",
+            "Utils\\": "utils/",
+            "Models\\": "models/",
+            "Controllers\\": "controllers"
+                     }
+    }
 }

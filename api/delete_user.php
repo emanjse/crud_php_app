@@ -1,38 +1,46 @@
 <?php
 session_start();
-header("Access-Control-Allow-Origin: *");
-header("Content-Type: application/json; charset=UTF-8");
-header("Access-Control-Allow-Methods: DELETE");
+require_once __DIR__ . '/../vendor/autoload.php';
 
-include_once '../config/Database.php';
-include_once '../models/User.php';
+use Config\Database;
+use Utils\Utils;
+use Models\User;
 
 $database = new Database();
-$db = $database->getConnection();
-$user = new User($db);
+$deleteUserController = new DeleteUserController($database);
 
+$deleteUserController->deleteUser();
 
-if (!isset($_SESSION['user_id'])) {
-    http_response_code(401);
-    echo json_encode(array("message" => "Unauthorized access."));
-    exit;
+class DeleteUserController
+{
+    private $db;
+
+    public function __construct(Database $database)
+    {
+        $this->db = $database->getConnection();
+    }
+
+    public function deleteUser()
+    {
+        Utils::setHeaders();
+        Utils::validateRequestMethod(['DELETE']);
+
+        if (!isset($_SESSION['user_id'])) {
+            Utils::respondWithError(401, "Unauthorized access.");
+        }
+
+        $logged_in_user_id = $_SESSION['user_id'];
+
+        $user_id = isset($_GET['id']) ? $_GET['id'] : die();
+
+        $user = new User($this->db);
+        $user->id = $user_id;
+
+        if ($user->delete($logged_in_user_id)) {
+            Utils::respondWithSuccess(200, "User deleted successfully.");
+        } else {
+            Utils::respondWithError(403, "You are not allowed to delete this user or the user does not exist.");
+        }
+    }
 }
-
-
-$logged_in_user_id = $_SESSION['user_id'];
-
-// Check if user ID is provided
-$user_id = isset($_GET['id']) ? $_GET['id'] : die();
-
-
-$user->id = $user_id;
-
-
-if ($user->delete($logged_in_user_id)) {
-    http_response_code(200);
-    echo json_encode(array("message" => "User deleted successfully."));
-} else {
-    http_response_code(403);
-    echo json_encode(array("message" => "You are not allowed to delete this user or the user does not exist."));
-}
-?>
+ ?>

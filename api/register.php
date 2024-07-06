@@ -1,57 +1,59 @@
 <?php
-session_start();
-header("Access-Control-Allow-Origin: *");
-header("Content-Type: application/json; charset=UTF-8");
-header("Access-Control-Allow-Methods: POST");
+require_once __DIR__ . '/../vendor/autoload.php';
 
-include_once '../config/Database.php';
-include_once '../models/User.php';
+use Utils\Utils;
+use Config\Database;
+use Models\User;
 
 $database = new Database();
-$db = $database->getConnection();
+$RegisterController = new RegisterController($database);
 
-$user = new User($db);
-
-$data = json_decode(file_get_contents("php://input"));
+$RegisterController->register();
 
 
-if ($data === null && json_last_error() !== JSON_ERROR_NONE) {
-    http_response_code(400);
-    echo json_encode(array("message" => "Invalid JSON data."));
-    exit;
-}
+class RegisterController
+{
+    private $db;
 
-// Check if all required fields are present
-if (
-    !isset($data->username) ||
-    !isset($data->address) ||
-    !isset($data->age) ||
-    !isset($data->email) ||
-    !isset($data->password)
-) {
-    http_response_code(400);
-    echo json_encode(array("message" => "Incomplete data."));
-    exit;
-}
+    public function __construct(Database $database)
+    {
+        $this->db = $database->getConnection();
+    }
 
-// Assign values to User object properties
-$user->username = $data->username;
-$user->address = $data->address;
-$user->age = $data->age;
-$user->email = $data->email;
-$user->password = $data->password;
+    public function register()
+    {
+        session_start();
+        Utils::setHeaders();
+        Utils::validateRequestMethod(['POST']);
 
-if (!$user->isValidEmail($user->email)) {
-    http_response_code(400);
-    echo json_encode(array("message" => "Email format is not right."));
-    exit;
-}
+        $user = new User($this->db);
+        $data = Utils::parseJsonInput();
 
-if ($user->register()) {
-    http_response_code(201);
-    echo json_encode(array("message" => "User created."));
-} else {
-    http_response_code(400);
-    echo json_encode(array("message" => "Unable to create user. Invalid data."));
+        if (
+            !isset($data->username) ||
+            !isset($data->address) ||
+            !isset($data->age) ||
+            !isset($data->email) ||
+            !isset($data->password)
+        ) {
+            Utils::respondWithError(400, "Incomplete data.");
+        }
+
+        $user->username = $data->username;
+        $user->address = $data->address;
+        $user->age = $data->age;
+        $user->email = $data->email;
+        $user->password = $data->password;
+
+        if (!$user->isValidEmail($user->email)) {
+            Utils::respondWithError(400, "Email format is not right.");
+        }
+
+        if ($user->register()) {
+            Utils::respondWithSuccess(201, "User created.");
+        } else {
+            Utils::respondWithError(400, "Unable to create user. Invalid data.");
+        }
+    }
 }
 ?>

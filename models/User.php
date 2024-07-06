@@ -1,4 +1,7 @@
 <?php
+
+namespace Models;
+
 class User
 {
     private $conn;
@@ -73,7 +76,7 @@ class User
         $stmt->bindParam(":email", $this->email);
 
         $stmt->execute();
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
 
         if ($row && password_verify($this->password, $row['password'])) {
             $this->id = $row['id'];
@@ -84,6 +87,7 @@ class User
         }
         return false;
     }
+
 
     public function getAllUsers()
     {
@@ -113,7 +117,7 @@ class User
         // Check if user exists
         if ($stmt->rowCount() > 0) {
 
-            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
 
             // Set properties
             $this->username = $row['username'];
@@ -129,39 +133,30 @@ class User
 
 
     //Update user
-    public function update()
+    public function update($data)
     {
-        // Check if the user exists
-        $query = "SELECT id FROM " . $this->table_name . " WHERE id = :id";
-        $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(':id', $this->id);
-        $stmt->execute();
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        // If the user doesn't exist
-        if (!$row) {
-            return 'not_exist';
+        // Validate input data
+        if (empty($data->username) || empty($data->address) || empty($data->age) || empty($data->email)) {
+            return ['success' => false, 'message' => 'Incomplete data.'];
         }
 
-        // If the logged-in user is not the owner of the user data
-        if ($row['id'] != $_SESSION['user_id']) {
-            return 'not_owner';
-        }
-
-        $query = "UPDATE users SET username = :username, address = :address, age = :age, email = :email WHERE id = :id";
+        // Update user information
+        $query = "UPDATE {$this->table_name} SET username = :username, address = :address, age = :age, email = :email WHERE id = :id";
         $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(':username', $this->username);
-        $stmt->bindParam(':address', $this->address);
-        $stmt->bindParam(':age', $this->age);
-        $stmt->bindParam(':email', $this->email);
+
+        $stmt->bindParam(':username', $data->username);
+        $stmt->bindParam(':address', $data->address);
+        $stmt->bindParam(':age', $data->age);
+        $stmt->bindParam(':email', $data->email);
         $stmt->bindParam(':id', $this->id);
 
         if ($stmt->execute()) {
-            return true;
+            return ['success' => true, 'message' => 'User information updated.'];
         }
 
-        return false;
+        return ['success' => false, 'message' => 'Unable to update user information.'];
     }
+
     //Delete user
     public function delete($logged_in_user_id)
     {

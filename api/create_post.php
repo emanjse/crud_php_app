@@ -1,48 +1,47 @@
 <?php
 session_start();
-header("Access-Control-Allow-Origin: *");
-header("Content-Type: application/json; charset=UTF-8");
-header("Access-Control-Allow-Methods: POST");
+require_once __DIR__ . '/../vendor/autoload.php';
 
-include_once '../config/Database.php';
-include_once '../models/Post.php';
+use Config\Database;
+use Utils\Utils;
+use Models\Post;
 
 $database = new Database();
-$db = $database->getConnection();
+$createPostController = new CreatePostController($database);
 
-$post = new Post($db);
+$createPostController->createPost();
 
-$data = json_decode(file_get_contents("php://input"));
+class CreatePostController
+{
+    private $db;
 
+    public function __construct(Database $database)
+    {
+        $this->db = $database->getConnection();
+    }
 
-if ($data === null && json_last_error() !== JSON_ERROR_NONE) {
-    http_response_code(400);
-    echo json_encode(array("message" => "Invalid JSON data."));
-    exit;
+    public function createPost()
+    {
+        Utils::setHeaders();
+        Utils::validateRequestMethod(['POST']);
+
+        $data = Utils::parseJsonInput();
+        if (!isset($_SESSION['user_id']) || empty($data->title) || empty($data->content)) {
+            Utils::respondWithError(400, "Incomplete data.");
+        }
+
+        $post = new Post($this->db);
+        $post->user_id = $_SESSION['user_id'];
+        $post->title = $data->title;
+        $post->content = $data->content;
+        $post->created_at = date('Y-m-d H:i:s');
+
+        if ($post->create()) {
+            Utils::respondWithSuccess(201, "Post created.");
+        } else {
+            Utils::respondWithError(400, "Unable to create post.");
+        }
+    }
 }
 
-// Check if all required fields are present
-if (
-    !isset($_SESSION['user_id']) ||
-    !isset($data->title) ||
-    !isset($data->content)
-) {
-    http_response_code(400);
-    echo json_encode(array("message" => "Incomplete data."));
-    exit;
-}
-
-// Assign values to Post object properties
-$post->user_id = $_SESSION['user_id'];
-$post->title = $data->title;
-$post->content = $data->content;
-$post->created_at = date('Y-m-d H:i:s');
-
-if ($post->create()) {
-    http_response_code(201);
-    echo json_encode(array("message" => "Post created."));
-} else {
-    http_response_code(400);
-    echo json_encode(array("message" => "Unable to create post."));
-}
 ?>
